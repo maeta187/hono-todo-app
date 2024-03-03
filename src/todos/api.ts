@@ -30,7 +30,7 @@ todos.post('/', async (c) => {
 todos.put('/:id', async (c) => {
 	// idはルート定義から補完が効く
 	const id = c.req.param('id');
-	let todo = findTodo(id);
+	const todo = findTodo(id);
 
 	if (!todo) {
 		return c.json({ message: 'Not Found' }, 404);
@@ -47,6 +47,18 @@ todos.put('/:id', async (c) => {
 			return v;
 		}
 	});
+
+	return new Response(null, { status: 204 });
+});
+
+// 削除
+todos.delete('/:id', async (c) => {
+	const id = c.req.param('id');
+	const todo = findTodo(id);
+	if (!todo) {
+		return c.json({ message: 'not found' }, 404);
+	}
+	todoList = todoList.filter((todo) => todo.id !== id);
 
 	return new Response(null, { status: 204 });
 });
