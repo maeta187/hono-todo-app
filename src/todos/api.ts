@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { validator } from 'hono/validator';
 
 let todoList = [
 	{ id: '1', title: 'Learning Hono', completed: false },
@@ -13,18 +14,29 @@ const todos = new Hono();
 todos.get('/', (c) => c.json(todoList));
 
 // 新規登録
-todos.post('/', async (c) => {
-	const param = await c.req.json<{ title: string }>();
-	const newTodo = {
-		id: String(todoList.length + 1),
-		completed: false,
-		title: param.title,
-	};
 
-	todoList = [...todoList, newTodo];
-
-	return c.json(newTodo, 201);
-});
+todos.post(
+	'/',
+	validator('json', (value: { title: string }, c) => {
+		const title = value.title.trim();
+		if (!title.length || typeof title !== 'string') {
+			return c.text('Invalid!', 400);
+		}
+		return {
+			body: title,
+		};
+	}),
+	async (c) => {
+		const param = await c.req.json<{ title: string }>();
+		const newTodo = {
+			id: String(todoList.length + 1),
+			completed: false,
+			title: param.title.trim(),
+		};
+		todoList = [...todoList, newTodo];
+		return c.json(newTodo, 201);
+	}
+);
 
 // 更新
 todos.put('/:id', async (c) => {
