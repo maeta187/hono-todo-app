@@ -1,20 +1,17 @@
 import { Hono } from 'hono';
 import { validator } from 'hono/validator';
+import { Bindings } from '../interface/bindings';
+import { createTodo, CreateTodo, deleteTodo, getTodo, getTodos, updateTodo, UpdateTodo } from '../model';
 
-let todoList = [
-	{ id: '1', title: 'Learning Hono', completed: false },
-	{ id: '2', title: 'Watch the movie', completed: false },
-	{ id: '3', title: 'Buy milk', completed: false },
-];
-
-const findTodo = (id: string) => todoList.find((v) => v.id === id);
+const todos = new Hono<{ Bindings: Bindings }>();
 
 // 一覧取得
-const todos = new Hono();
-todos.get('/', (c) => c.json(todoList));
+todos.get('/', async (c) => {
+	const todos = await getTodos(c.env.HONO_TODO);
+	return c.json(todos);
+});
 
 // 新規登録
-
 todos.post(
 	'/',
 	validator('json', (value: { title: string }, c) => {
@@ -27,13 +24,9 @@ todos.post(
 		};
 	}),
 	async (c) => {
-		const param = await c.req.json<{ title: string }>();
-		const newTodo = {
-			id: String(todoList.length + 1),
-			completed: false,
-			title: param.title.trim(),
-		};
-		todoList = [...todoList, newTodo];
+		const param = await c.req.json<CreateTodo>();
+		const newTodo = await createTodo(c.env.HONO_TODO, param);
+
 		return c.json(newTodo, 201);
 	}
 );
@@ -42,23 +35,13 @@ todos.post(
 todos.put('/:id', async (c) => {
 	// idはルート定義から補完が効く
 	const id = c.req.param('id');
-	const todo = findTodo(id);
-
+	const todo = await getTodo(c.env.HONO_TODO, id);
 	if (!todo) {
-		return c.json({ message: 'Not Found' }, 404);
+		return c.json({ message: 'not found' }, 404);
 	}
+	const param = await c.req.json<UpdateTodo>();
 
-	const param = (await c.req.parseBody()) as {
-		title?: string;
-		completed?: boolean;
-	};
-	todoList = todoList.map((v) => {
-		if (v.id === id) {
-			return { ...v, ...param };
-		} else {
-			return v;
-		}
-	});
+	await updateTodo(c.env.HONO_TODO, id, param);
 
 	return new Response(null, { status: 204 });
 });
@@ -66,11 +49,12 @@ todos.put('/:id', async (c) => {
 // 削除
 todos.delete('/:id', async (c) => {
 	const id = c.req.param('id');
-	const todo = findTodo(id);
+	const todo = await getTodo(c.env.HONO_TODO, id);
 	if (!todo) {
 		return c.json({ message: 'not found' }, 404);
 	}
-	todoList = todoList.filter((todo) => todo.id !== id);
+
+	await deleteTodo(c.env.HONO_TODO, id);
 
 	return new Response(null, { status: 204 });
 });
